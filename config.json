@@ -1,0 +1,62 @@
+{
+ # Comments are okay
+ "links" : {
+    "terms_of_service" : "http://www.librarysimplified.org/NYPLEULA",
+    "privacy_policy" : "http://www.nypl.org/help/about-nypl/legal-notices/privacy-policy"
+ },
+ "policies" : {
+    "lending" : {
+        "60": {"audiences": ["Children"]}, 
+        "152": {"audiences": ["Children"]}, 
+        "62": {"audiences": ["Children"]}
+    },
+    "languages" : {
+        "large_collections" : ["eng"],
+        "small_collections" : ["rus", "chi", "spa"]
+    },
+    "featured_lane_size" : 3,
+    "minimum_featured_quality" : 0,
+    "holds" : "allow",
+    "default_page_max_age": 0,
+#   "authentication" : ["api.millenium_patron"]
+    "authentication" : ["api.evergreen_patron"]
+},
+"integrations" : {
+    "Circulation Manager" : {
+      "url": "http://nypl2.dlogics.com"
+    },
+    "Content Server" : {
+#     "url": "http://acstheta.dlogics.com/bookstore/catalog.opds"
+      "url": "http://dl-simplified.dlogics.com/groups/"
+    },
+    "Elasticsearch" : {
+      "url": "http://nypl2.dlogics.com",
+      "works_index": "circulation-works"
+    },
+    "Evergreen" : {
+      "url": "http://dl-ils.dlogics.com",
+      "test_username" : "7",
+      "test_password" : "7777"
+    },
+    "Metadata Wrangler" : {
+      "url": "http://nypl2.dlogics.com/meta"
+#     "url": ""
+    },
+    "Millenium" : {
+      "url" : "http://dans-ubuntu-nypl2.dlogics.com/millennium/PATRONAPI/",
+      "test_username" : "5",
+      "test_password" : "5555"
+    },
+    "Theta" : {
+      "library_id" : "ThetaACS",
+      "username" : "name",
+      "password" : "pass",
+      "server" : "http://acstheta.dlogics.com/bookstore/api/"
+    },
+    "Postgres" : {
+      "production_url": "postgres://simplified:simppass@localhost/simplified_circulation_dev"
+#     "test_url": "postgres://simplified:simppass@localhost/simplified_circulation_test"
+    }
+},
+"default_notification_email_address": "noreply@pixelchimera.com"
+}
