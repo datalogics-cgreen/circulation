@@ -38,14 +38,14 @@ class FulfillmentInfo(CirculationInfo):
     :param identifier_type Ex: Third party provider, ISBN, URI, etc...
     :param identifier Contains ISBN or third party item id, etc., and links to LicensePool, Work, etc..
     :param content_link Either URL to download ACSM file from or URL to streaming content.
-    :param content_type Media type of the book version we're getting.  
-        Ex: "text/html" or Representation.TEXT_HTML_MEDIA_TYPE + DeliveryMechanism.STREAMING_PROFILE 
+    :param content_type Media type of the book version we're getting.
+        Ex: "text/html" or Representation.TEXT_HTML_MEDIA_TYPE + DeliveryMechanism.STREAMING_PROFILE
         or EPUB_MEDIA_TYPE.
     :param content Body of acsm file or empty.  Would have either content or content_link filled in.
     :param content_expires Download link expiration datetime.
     """
 
-    def __init__(self, identifier_type, identifier, content_link, content_type, 
+    def __init__(self, identifier_type, identifier, content_link, content_type,
                  content, content_expires):
         self.identifier_type = identifier_type
         self.identifier = identifier
@@ -53,7 +53,7 @@ class FulfillmentInfo(CirculationInfo):
         self.content_type = content_type
         self.content = content
         self.content_expires = content_expires
-    
+
     def __repr__(self):
         if self.content:
             blength = len(self.content)
@@ -70,7 +70,7 @@ class LoanInfo(CirculationInfo):
     :param identifier_type Ex.: Identifier.ONECLICK_ID.
     :param identifier Expected to be the unicode string of the isbn, etc..
     :param start_date When the patron checked the book out.
-    :param end_date When checked-out book is due.  Expected to be passed in 
+    :param end_date When checked-out book is due.  Expected to be passed in
     date, not unicode format.
     :param fulfillment_info A FulfillmentInfo object.
     """
@@ -91,7 +91,7 @@ class LoanInfo(CirculationInfo):
         f = "%Y/%m/%d"
         return "<LoanInfo for %s/%s, start=%s end=%s>%s" % (
             self.identifier_type, self.identifier,
-            self.fd(self.start_date), self.fd(self.end_date), 
+            self.fd(self.start_date), self.fd(self.end_date),
             fulfillment
         )
 
@@ -102,13 +102,13 @@ class HoldInfo(CirculationInfo):
     :param identifier_type Ex.: Identifier.ONECLICK_ID.
     :param identifier Expected to be the unicode string of the isbn, etc..
     :param start_date When the patron made the reservation.
-    :param end_date When reserved book is expected to become available.  Expected to be passed in 
+    :param end_date When reserved book is expected to become available.  Expected to be passed in
         date, not unicode format.
-    :param hold_position  Patron's place in the hold line.  
+    :param hold_position  Patron's place in the hold line.
         When not available, default to be passed is None, which is equivalent to "first in line".
     """
 
-    def __init__(self, identifier_type, identifier, start_date, end_date, 
+    def __init__(self, identifier_type, identifier, start_date, end_date,
                  hold_position):
         self.identifier_type = identifier_type
         self.identifier = identifier
@@ -119,7 +119,7 @@ class HoldInfo(CirculationInfo):
     def __repr__(self):
         return "<HoldInfo for %s/%s, start=%s end=%s, position=%s>" % (
             self.identifier_type, self.identifier,
-            self.fd(self.start_date), self.fd(self.end_date), 
+            self.fd(self.start_date), self.fd(self.end_date),
             self.hold_position
         )
 
@@ -130,12 +130,13 @@ class CirculationAPI(object):
     between different circulation APIs.
     """
 
-    def __init__(self, _db, overdrive=None, threem=None, axis=None):
+    def __init__(self, _db, overdrive=None, threem=None, axis=None, enki=None):
         self._db = _db
         self.overdrive = overdrive
         self.threem = threem
         self.axis = axis
-        self.apis = [x for x in (overdrive, threem, axis) if x]
+        self.enki = enki
+        self.apis = [x for x in (overdrive, threem, axis, enki) if x]
         self.log = logging.getLogger("Circulation API")
 
         # When we get our view of a patron's loans and holds, we need
@@ -155,11 +156,15 @@ class CirculationAPI(object):
             data_sources_for_sync.append(
                 DataSource.lookup(_db, DataSource.AXIS_360)
             )
+        if self.enki:
+            data_sources_for_sync.append(
+                DataSource.lookup(_db, DataSource.ENKI)
+            )
 
 
         h = dict()
         for ds in data_sources_for_sync:
-            type = ds.primary_identifier_type 
+            type = ds.primary_identifier_type
             h[type] = ds.name
             if type in Identifier.DEPRECATED_NAMES:
                 new_name = Identifier.DEPRECATED_NAMES[type]
@@ -177,6 +182,8 @@ class CirculationAPI(object):
             api = self.threem
         elif licensepool.data_source.name==DataSource.AXIS_360:
             api = self.axis
+        #elif licensepool.data_source.name==DataSource.ENKI:
+            #api = self.enki
         else:
             return None
 
@@ -198,14 +205,14 @@ class CirculationAPI(object):
                hold_notification_email=None):
         """Either borrow a book or put it on hold. Don't worry about fulfilling
         the loan yet.
-        
+
         :return: A 3-tuple (`Loan`, `Hold`, `is_new`). Either `Loan`
         or `Hold` must be None, but not both.
         """
         # Short-circuit the request if the patron lacks borrowing
         # privileges.
-        PatronUtility.assert_borrowing_privileges(patron)        
-        
+        PatronUtility.assert_borrowing_privileges(patron)
+
         now = datetime.datetime.utcnow()
         if licensepool.open_access:
             # We can 'loan' open-access content ourselves just by
@@ -218,7 +225,7 @@ class CirculationAPI(object):
             return loan, None, is_new
 
         # Okay, it's not an open-access book. This means we need to go
-        # to an external service to get the book. 
+        # to an external service to get the book.
         #
         # This also means that our internal model of whether this book
         # is currently on loan or on hold might be wrong.
@@ -229,7 +236,7 @@ class CirculationAPI(object):
 
         if must_set_delivery_mechanism and not delivery_mechanism:
             raise DeliveryMechanismMissing()
-    
+
         content_link = content_expires = None
 
         internal_format = api.internal_format(delivery_mechanism)
@@ -244,7 +251,7 @@ class CirculationAPI(object):
              self._db, Loan, patron=patron, license_pool=licensepool,
              on_multiple='interchangeable'
         )
-        
+
         loan_info = None
         hold_info = None
         if existing_loan:
@@ -278,11 +285,11 @@ class CirculationAPI(object):
         except AlreadyCheckedOut:
             # This is good, but we didn't get the real loan info.
             # Just fake it.
-            identifier = licensepool.identifier            
+            identifier = licensepool.identifier
             loan_info = LoanInfo(
-                identifier.type, 
+                identifier.type,
                 identifier,
-                start_date=None, 
+                start_date=None,
                 end_date=now + datetime.timedelta(hours=1)
             )
         except AlreadyOnHold:
@@ -363,7 +370,7 @@ class CirculationAPI(object):
         hold, is_new = licensepool.on_hold_to(
             patron,
             hold_info.start_date or now,
-            hold_info.end_date, 
+            hold_info.end_date,
             hold_info.hold_position
         )
 
@@ -389,7 +396,7 @@ class CirculationAPI(object):
             self._db, licensepool,
             CirculationEvent.CM_CHECKOUT,
         )
-    
+
     def fulfill(self, patron, pin, licensepool, delivery_mechanism, sync_on_failure=True):
         """Fulfil a book that a patron has previously checked out.
 
@@ -420,7 +427,7 @@ class CirculationAPI(object):
         if loan.fulfillment is not None and loan.fulfillment != delivery_mechanism and not delivery_mechanism.delivery_mechanism.is_streaming:
             raise DeliveryMechanismConflict(
                 _("You already fulfilled this loan as %(loan_delivery_mechanism)s, you can't also do it as %(requested_delivery_mechanism)s",
-                  loan_delivery_mechanism=loan.fulfillment.delivery_mechanism.name, 
+                  loan_delivery_mechanism=loan.fulfillment.delivery_mechanism.name,
                   requested_delivery_mechanism=delivery_mechanism.delivery_mechanism.name)
             )
 
@@ -490,7 +497,7 @@ class CirculationAPI(object):
         return FulfillmentInfo(
             identifier_type=licensepool.identifier.type,
             identifier=licensepool.identifier.identifier,
-            content_link=content_link, content_type=media_type, content=None, 
+            content_link=content_link, content_type=media_type, content=None,
             content_expires=None
         )
 
@@ -620,7 +627,7 @@ class CirculationAPI(object):
                         l = holds
                     else:
                         self.log.warn(
-                            "value %r from patron_activity is neither a loan nor a hold.", 
+                            "value %r from patron_activity is neither a loan nor a hold.",
                             i
                         )
                     if l is not None:
@@ -808,7 +815,7 @@ class BaseCirculationAPI(object):
 
 
     def checkin(self, patron, pin, licensepool):
-        """  Return a book early.  
+        """  Return a book early.
 
         :param patron: a Patron object for the patron who wants
         to check out the book.
@@ -861,5 +868,3 @@ class BaseCirculationAPI(object):
         any reason.
         """
         raise NotImplementedException()
-
-

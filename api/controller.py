@@ -35,7 +35,7 @@ from core.external_search import (
     DummyExternalSearchIndex,
 )
 from core.lane import (
-    Facets, 
+    Facets,
     Pagination,
     Lane,
     LaneList,
@@ -62,7 +62,7 @@ from core.model import (
 from core.opds import (
     AcquisitionFeed,
 )
-from core.util.opds_writer import (    
+from core.util.opds_writer import (
      OPDSFeed,
 )
 from core.opensearch import OpenSearchDocument
@@ -93,7 +93,7 @@ from authenticator import (
     OAuthController,
 )
 from config import (
-    Configuration, 
+    Configuration,
     CannotLoadConfiguration,
     FacetConfig,
 )
@@ -114,6 +114,7 @@ from adobe_vendor_id import (
 from axis import Axis360API
 from overdrive import OverdriveAPI
 from threem import ThreeMAPI
+#from enki import EnkiAPI
 from circulation import CirculationAPI
 from novelist import (
     NoveListAPI,
@@ -217,10 +218,11 @@ class CirculationManager(object):
             threem = ThreeMAPI.from_environment(self._db)
             axis = Axis360API.from_environment(self._db)
             self.circulation = CirculationAPI(
-                _db=self._db, 
-                threem=threem, 
+                _db=self._db,
+                threem=threem,
                 overdrive=overdrive,
-                axis=axis
+                axis=axis#,
+                #enki=enki
             )
 
     def setup_controllers(self):
@@ -234,7 +236,7 @@ class CirculationManager(object):
         self.analytics_controller = AnalyticsController(self)
         self.oauth_controller = OAuthController(self.auth)
         self.profiles = ProfileController(self)
-        
+
         self.heartbeat = HeartbeatController()
         self.service_status = ServiceStatusController(self)
 
@@ -269,7 +271,7 @@ class CirculationManager(object):
             except CannotLoadConfiguration, e:
                 self.log.warn("DRM Device Management Protocol controller is disabled due to missing or incomplete Adobe configuration. This may be cause for concern.")
 
-            
+
     def annotator(self, lane, *args, **kwargs):
         """Create an appropriate OPDS annotator for the given lane."""
         return CirculationManagerAnnotator(
@@ -329,7 +331,7 @@ class CirculationManagerController(BaseCirculationManagerController):
         return pool
 
     def load_licensepooldelivery(self, pool, mechanism_id):
-        """Turn user input into a LicensePoolDeliveryMechanism object.""" 
+        """Turn user input into a LicensePoolDeliveryMechanism object."""
         mechanism = get_one(
             self._db, LicensePoolDeliveryMechanism, license_pool=pool,
             delivery_mechanism_id=mechanism_id, on_multiple='interchangeable'
@@ -353,7 +355,7 @@ class CirculationManagerController(BaseCirculationManagerController):
             return FORBIDDEN_BY_POLICY.detailed(
                 _("Library policy prohibits the placement of holds."),
                 status_code=403
-            )        
+            )
         return None
 
 
@@ -397,10 +399,10 @@ class IndexController(CirculationManagerController):
                     'acquisition_groups'
                 )
             )
-    
+
         return redirect(
             self.cdn_url_for(
-                'acquisition_groups', 
+                'acquisition_groups',
                 languages=root_lane.language_key,
                 lane_name=root_lane.url_name
             )
@@ -468,12 +470,12 @@ class OPDSFeedController(CirculationManagerController):
         if isinstance(pagination, ProblemDetail):
             return pagination
 
-        # Run a search.    
+        # Run a search.
         this_url += "?q=" + urllib.quote(query.encode("utf8"))
         annotator = self.manager.annotator(lane)
         info = OpenSearchDocument.search_info(lane)
         opds_feed = AcquisitionFeed.search(
-            _db=self._db, title=info['name'], 
+            _db=self._db, title=info['name'],
             url=this_url, lane=lane, search_engine=self.manager.external_search,
             query=query, annotator=annotator, pagination=pagination,
         )
@@ -633,21 +635,21 @@ class LoanController(CirculationManagerController):
         patron = flask.request.patron
         header = self.authorization_header()
         credential = self.manager.auth.get_credential_from_header(header)
-    
+
         # Turn source + identifier into a LicensePool
         pool = self.load_licensepool(data_source, identifier_type, identifier)
         if isinstance(pool, ProblemDetail):
             return pool
 
         loan = get_one(self._db, Loan, patron=patron, license_pool=pool)
-    
+
         # Find the LicensePoolDeliveryMechanism they asked for.
         mechanism = None
         if mechanism_id:
             mechanism = self.load_licensepooldelivery(pool, mechanism_id)
             if isinstance(mechanism, ProblemDetail):
                 return mechanism
-            
+
         if not mechanism:
             # See if the loan already has a mechanism set. We can use that.
             if loan and loan.fulfillment:
@@ -656,13 +658,13 @@ class LoanController(CirculationManagerController):
                 return BAD_DELIVERY_MECHANISM.detailed(
                     _("You must specify a delivery mechanism to fulfill this loan.")
                 )
-    
+
         try:
             fulfillment = self.circulation.fulfill(patron, credential, pool, mechanism)
         except DeliveryMechanismConflict, e:
             return DELIVERY_CONFLICT.detailed(e.message)
         except NoActiveLoan, e:
-            return NO_ACTIVE_LOAN.detailed( 
+            return NO_ACTIVE_LOAN.detailed(
                     _('Can\'t fulfill loan because you have no active loan for this book.'),
                     status_code=e.status_code
             )
@@ -772,7 +774,7 @@ class LoanController(CirculationManagerController):
             hold = get_one(self._db, Hold, patron=patron, license_pool=pool)
 
         if not loan and not hold:
-            return NO_ACTIVE_LOAN_OR_HOLD.detailed( 
+            return NO_ACTIVE_LOAN_OR_HOLD.detailed(
                 _('You have no active loan or hold for "%(title)s".', title=pool.work.title),
                 status_code=404
             )
@@ -829,7 +831,7 @@ class AnnotationController(CirculationManagerController):
         id_obj, ignore = Identifier.for_foreign_id(
             self._db, identifier_type, identifier)
         return self.container(identifier=id_obj, accept_post=False)
- 
+
     def detail(self, annotation_id):
         headers = dict()
         headers['Allow'] = 'GET,HEAD,OPTIONS,DELETE'
@@ -997,19 +999,19 @@ class WorkController(CirculationManagerController):
 
     def report(self, data_source, identifier_type, identifier):
         """Report a problem with a book."""
-    
+
         # Turn source + identifier into a LicensePool
         pool = self.load_licensepool(data_source, identifier_type, identifier)
         if isinstance(pool, ProblemDetail):
             # Something went wrong.
             return pool
-    
+
         if flask.request.method == 'GET':
             # Return a list of valid URIs to use as the type of a problem detail
             # document.
             data = "\n".join(Complaint.VALID_TYPES)
             return Response(data, 200, {"Content-Type" : "text/uri-list"})
-    
+
         data = flask.request.data
         controller = ComplaintController()
         return controller.register(pool, data)
@@ -1063,7 +1065,7 @@ class ProfileController(CirculationManagerController):
         patron = self.authenticated_patron_from_request()
         storage = PatronProfileStorage(patron)
         return CoreProfileController(storage)
-        
+
     def protocol(self):
         """Handle a UPMP request."""
         controller = self._controller
