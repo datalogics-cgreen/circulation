@@ -706,7 +706,7 @@ class SIPClient(Constants):
                 done = True
             if len(data) > max_size:
                 raise IOError("SIP2 response too large.")
-
+        print "\nHEY, CHRIS, HERE'S THE DATA IN read_message:\n\n%s" % s
         return data
   
     def append_checksum(self, text, include_sequence_number=True):

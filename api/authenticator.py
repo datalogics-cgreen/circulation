@@ -1294,6 +1294,7 @@ class BasicAuthenticationProvider(AuthenticationProvider):
             return server_side_validation_result
 
         # Check these credentials with the source of truth.
+        print "\nHEY, CHRIS, we're trying the username %s and password %s in api/authenticator.py\n" % (username,password)
         patrondata = self.remote_authenticate(username, password)
 
         if not patrondata or isinstance(patrondata, ProblemDetail):
