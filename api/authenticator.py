@@ -1357,6 +1357,7 @@ class BasicAuthenticationProvider(AuthenticationProvider):
         # update the Patron record with the account information we
         # just got from the source of truth.
         patrondata.apply(patron)
+        print "\nHEY, CHRIS, we found a patron! Here's a printout:\n%s\n" % patron
         return patron
 
     def get_credential_from_header(self, header):
@@ -1398,6 +1399,7 @@ class BasicAuthenticationProvider(AuthenticationProvider):
 
         if self.password_maximum_length:
             valid = valid and password and (len(password) <= self.password_maximum_length)
+        print "\nHEY, CHRIS, according to server_side_validation, these creds are %s\n" % valid
         return valid
 
     def remote_authenticate(self, username, password):

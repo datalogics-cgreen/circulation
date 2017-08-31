@@ -387,6 +387,7 @@ class SIPClient(Constants):
         )
         if location_code:
             message = message + self.separator + "CP" + location_code
+        print "\nHEY, CHRIS, this is our login_message:\n%s\n" % message
         return message
 
     def login_response_parser(self, message):
@@ -609,6 +610,7 @@ class SIPClient(Constants):
                 "Expected required field %s but did not find it.",
                 field.sip_code
             )
+
         return parsed
 
     def consume_status_code(self, data, expected, in_progress):
@@ -707,7 +709,7 @@ class SIPClient(Constants):
                 done = True
             if len(data) > max_size:
                 raise IOError("SIP2 response too large.")
-        print "\nHEY, CHRIS, HERE'S THE DATA IN read_message:\n\n%s" % data
+        print "\nHEY, CHRIS, HERE'S THE DATA IN read_message:\n%s\n" % data
         return data
 
     def append_checksum(self, text, include_sequence_number=True):
