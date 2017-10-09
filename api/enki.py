@@ -376,8 +376,11 @@ class EnkiAPI(BaseCirculationAPI):
                 raise CirculationException()
         for loan in result['checkedOutItems']:
             yield self.parse_patron_loans(loan)
-        for hold in result['holds']:
-            yield self.parse_patron_holds(hold)
+        # TODO: Check both 'available' and 'unavailable' holds (The If statement below is a suggestion)
+        # Commented out to suppress "None from patron_activity..." log message until Enki holds are functional
+        """if len(result['holds']['available']) > 0 or len(result['holds']['unavailable']) > 0:
+            for hold in result['holds']:
+                yield self.parse_patron_holds(hold)"""
 
     def patron_request(self, patron, pin):
         self.log.debug ("Querying Enki for information on patron %s" % patron)
@@ -607,9 +610,9 @@ class EnkiImport(CollectionMonitor):
     SERVICE_NAME = "Enki Circulation Monitor"
     INTERVAL_SECONDS = 500
     PROTOCOL = EnkiAPI.ENKI_EXTERNAL
-    DEFAULT_BATCH_SIZE = 100 
+    DEFAULT_BATCH_SIZE = 100
     FIVE_MINUTES = datetime.timedelta(minutes=5)
-    
+
     def __init__(self, _db, collection, api_class=EnkiAPI):
         """Constructor."""
         super(EnkiImport, self).__init__(_db, collection)
